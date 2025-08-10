@@ -1,8 +1,9 @@
+require("dotenv").config();
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 5000;
 const cors = require("cors");
-require("dotenv").config();
+
 const { MongoClient, ServerApiVersion } = require("mongodb");
 
 app.use(cors());
@@ -26,7 +27,11 @@ async function run() {
     // Define the database collections
     const quizzesCollection = client.db("quizDB").collection("quizzes");
     const usersCollection = client.db("quizDB").collection("users");
-
+    
+    app.get('/',async(req,res)=>{
+        const result =await quizzesCollection.find().toArray();
+        res.send(result)
+    })
     app.get("/users/data", async (req, res) => {
       try {
         const userEmail = req.query.email;
@@ -39,15 +44,14 @@ async function run() {
 
         const user = await usersCollection.findOne({ email: userEmail });
 
-        // If findOne() returns a user document, send it.
-        // Otherwise, it returns null, and the condition is false.
+        
         if (user) {
-          console.log(`User found: ${user.name}`);
-          // Use res.json() to send a JSON response
+         
+        
           res.json(user);
         } else {
-          // If the user object is null, send a 404 Not Found response
-          console.log(`User not found for email: ${userEmail}`);
+         
+          
           res.status(404).json({ error: "User not found." });
         }
       } catch (error) {
@@ -147,12 +151,40 @@ async function run() {
           });
       }
     });
-
+// Mark user as failed if they fail step 1
+app.patch("/users/mark-failed", async (req, res) => {
+    try {
+      const { email } = req.query;
+  
+      if (!email) {
+        return res.status(400).json({ message: "Email is required." });
+      }
+  
+      const result = await usersCollection.updateOne(
+        { email: email },
+        { $addToSet: { certificates: "Failed" } } // Avoid duplicates
+      );
+  
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ message: "User not found." });
+      }
+  
+      res.status(200).json({
+        message: "User marked as Failed successfully.",
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("Error marking user as failed:", error);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  });
+  
     // Send a ping to confirm a successful connection
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
   } finally {
+    // 
   }
 }
 
