@@ -54,7 +54,8 @@ async function run() {
                     name,
                     email,
                     role,
-                    password, // In a real application, you should hash this password
+                    password, 
+                    certificates:[],
                     createdAt: new Date()
                 };
         
@@ -73,7 +74,47 @@ async function run() {
                 res.status(500).json({ message: "An error occurred during sign-up. Please try again later." });
             }
         });
-        
+        app.patch('/users/certificates', async (req, res) => {
+            try {
+                const { email } = req.query; // Get email from query string
+                const { certificate } = req.body;
+                
+                // Validate the input
+                if (!email || !certificate) {
+                    return res.status(400).json({ message: "Email and certificate are required." });
+                }
+
+                // The $addToSet operator ensures the certificate is added only if it's not already in the array.
+                // This prevents duplicates and handles the "already have the certificate" case you mentioned.
+                const result = await usersCollection.updateOne(
+                    { email: email }, // Find user by email
+                    { $addToSet: { certificates: certificate } }
+                );
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).json({ message: "User not found with the provided email." });
+                }
+                
+                // If modifiedCount is 0, it means the certificate was already present.
+                if (result.modifiedCount === 0) {
+                     return res.status(200).json({ 
+                        message: "Certificate already exists for this user. No changes made.",
+                        modifiedCount: result.modifiedCount
+                    });
+                }
+
+
+                res.status(200).json({ 
+                    message: "Certificate added successfully!",
+                    modifiedCount: result.modifiedCount 
+                });
+
+            } catch (error) {
+                console.error("Error patching user certificate:", error);
+                res.status(500).json({ message: "An error occurred while updating the certificate." });
+            }
+        });
+
         // Send a ping to confirm a successful connection
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
